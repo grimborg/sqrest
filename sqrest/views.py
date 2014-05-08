@@ -1,4 +1,6 @@
-from flask import Flask, jsonify, request
+import urlparse
+
+from flask import Flask, jsonify, request, url_for
 from flask.views import MethodView
 from flask.ext.sqlalchemy import SQLAlchemy
 from sqrest import models
@@ -16,23 +18,25 @@ def register(cls):
 
 class Service(MethodView):
     __model__ = None
+    __model_name__ = None
 
     def get(self, primary_key=None):
-        r = {self.__model_name__ + 's': [map(self._serialize, self.__model__.query)]}
+        r = {self.__model_name__ + 's': [map(self._model_to_dict, self.__model__.query)]}
+        print url_for(self.__model_name__)
         return jsonify(**r)
-        #return jsonify(machines=[self._serialize(x) for x in self.__model__.query.all()])
 
     def post(self):
         obj = self.__model__(**request.json)
         db.session.add(obj)
         db.session.commit()
-        r = {self.__model_name__: self._serialize(obj)}
+        r = {self.__model_name__: self._model_to_dict(obj)}
         return jsonify(**r)
 
-    def _serialize(self, obj):
+    def _model_to_dict(self, obj):
         r = dict()
         for c in obj.__table__.columns:
             r[c.name] = getattr(obj, c.name)
+        r['url'] = urlparse.urljoin(url_for(self.__model_name__, _external=True), str(obj.id))
         return r
 
 register(models.Machine)
